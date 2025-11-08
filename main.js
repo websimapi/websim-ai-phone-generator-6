@@ -75,7 +75,7 @@ async function generatePhone() {
 }
 
 function resetApp() {
-    if (state.originalImageWithBlackScreen) {
+    if (state.phoneBodyOverlay) {
         resetState();
         ui.showControls(true);
         ui.showResetText(false);

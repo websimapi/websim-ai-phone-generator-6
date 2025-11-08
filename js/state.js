@@ -1,6 +1,7 @@
 export const state = {
     phoneState: 'initial', // 'initial', 'generating', 'locked', 'unlocked', 'in-app'
-    originalImageWithBlackScreen: null,
+    phoneBodyOverlay: null,
+    screenBackground: null,
     screenBounds: null,
     iconBounds: [],
     currentApp: null,
@@ -9,7 +10,8 @@ export const state = {
 
 export function resetState() {
     state.phoneState = 'initial';
-    state.originalImageWithBlackScreen = null;
+    state.phoneBodyOverlay = null;
+    state.screenBackground = null;
     state.screenBounds = null;
     state.iconBounds = [];
     state.currentApp = null;
