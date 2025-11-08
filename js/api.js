@@ -6,9 +6,7 @@ export async function generatePhoneImage(userPrompt) {
         const result = await websim.imageGen({
             prompt: fullPrompt,
             transparent: true,
-            width: 512,
-            height: 768,
-            aspect_ratio: "2:3"
+            aspect_ratio: "9:16"
         });
         return result.url;
     } catch (error) {
