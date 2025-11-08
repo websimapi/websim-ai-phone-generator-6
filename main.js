@@ -14,6 +14,11 @@ function handleCanvasClick(e) {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
+    // Ignore clicks outside the detected screen area
+    if (x < state.screenBounds.minX || x > state.screenBounds.maxX || y < state.screenBounds.minY || y > state.screenBounds.maxY) {
+        return;
+    }
+
     if (state.phoneState === 'locked') {
         state.phoneState = 'unlocked';
         drawHomeScreen();
