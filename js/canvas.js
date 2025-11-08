@@ -127,16 +127,43 @@ export function processImage(imageUrl, onProcessed) {
             console.log("Center pixel is not pink. Could not detect screen.");
         }
     
-        state.originalImageWithBlackScreen = new Image();
-        state.originalImageWithBlackScreen.src = canvas.toDataURL();
-        state.originalImageWithBlackScreen.onload = () => {
-            if (foundScreen) {
+        // This part is now handled differently. The logic is moved inside the `if (foundScreen)` block.
+        if (foundScreen) {
+             // Create the bezel image.
+            const bezelCanvas = document.createElement('canvas');
+            bezelCanvas.width = canvas.width;
+            bezelCanvas.height = canvas.height;
+            const bezelCtx = bezelCanvas.getContext('2d');
+            // Draw the original scaled phone image
+            bezelCtx.drawImage(
+                img,
+                phoneBounds.minX, phoneBounds.minY, phoneWidth, phoneHeight,
+                0, 0, canvas.width, canvas.height
+            );
+            // Clear the detected screen area to create the bezel overlay
+            bezelCtx.clearRect(
+                localScreenBounds.minX, 
+                localScreenBounds.minY, 
+                localScreenBounds.maxX - localScreenBounds.minX, 
+                localScreenBounds.maxY - localScreenBounds.minY
+            );
+            
+            state.phoneBezelImage = new Image();
+            state.phoneBezelImage.src = bezelCanvas.toDataURL();
+            state.phoneBezelImage.onload = () => {
                 state.screenBounds = localScreenBounds;
                 onProcessed(true);
-            } else {
-                onProcessed(false);
-            }
-        };
+            };
+        } else {
+            // Draw the unprocessed image if no screen is found
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(
+                img,
+                phoneBounds.minX, phoneBounds.minY, phoneWidth, phoneHeight,
+                0, 0, canvas.width, canvas.height
+            );
+            onProcessed(false);
+        }
     };
     img.onerror = () => {
         alert('Failed to load the generated image.');
@@ -145,15 +172,43 @@ export function processImage(imageUrl, onProcessed) {
     img.src = imageUrl;
 }
 
+function setupScreenClip() {
+    if (!state.screenBounds) return;
+    const bounds = state.screenBounds;
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    // Dynamic radius based on screen size, with a max value
+    const radius = Math.min(width * 0.08, height * 0.08, 30); 
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(bounds.minX + radius, bounds.minY);
+    ctx.lineTo(bounds.maxX - radius, bounds.minY);
+    ctx.quadraticCurveTo(bounds.maxX, bounds.minY, bounds.maxX, bounds.minY + radius);
+    ctx.lineTo(bounds.maxX, bounds.maxY - radius);
+    ctx.quadraticCurveTo(bounds.maxX, bounds.maxY, bounds.maxX - radius, bounds.maxY);
+    ctx.lineTo(bounds.minX + radius, bounds.maxY);
+    ctx.quadraticCurveTo(bounds.minX, bounds.maxY, bounds.minX, bounds.maxY - radius);
+    ctx.lineTo(bounds.minX, bounds.minY + radius);
+    ctx.quadraticCurveTo(bounds.minX, bounds.minY, bounds.minX + radius, bounds.minY);
+    ctx.closePath();
+    ctx.clip();
+}
+
 export function startClock() {
     if (state.timeInterval) {
         clearInterval(state.timeInterval);
     }
 
     const drawTime = () => {
-        if (!state.originalImageWithBlackScreen || !state.originalImageWithBlackScreen.complete) return;
+        if (!state.phoneBezelImage || !state.phoneBezelImage.complete) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(state.originalImageWithBlackScreen, 0, 0);
+        
+        setupScreenClip();
+
+        // Draw black background for the screen
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         const now = new Date();
         const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -168,6 +223,9 @@ export function startClock() {
         const fontSize = Math.max(12, Math.floor(screenWidth / 8));
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.fillText(timeString, centerX, centerY);
+
+        ctx.restore(); // remove clipping
+        ctx.drawImage(state.phoneBezelImage, 0, 0);
     };
 
     drawTime();
@@ -279,14 +337,19 @@ function drawAppIcon(x, y, size, color, type) {
 }
 
 export function drawHomeScreen() {
-    if (!state.originalImageWithBlackScreen || !state.originalImageWithBlackScreen.complete) return;
+    if (!state.phoneBezelImage || !state.phoneBezelImage.complete) return;
     if (state.timeInterval) {
         clearInterval(state.timeInterval);
         state.timeInterval = null;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(state.originalImageWithBlackScreen, 0, 0);
+
+    setupScreenClip();
+
+    // Draw black background
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     state.iconBounds = [];
 
@@ -321,17 +384,26 @@ export function drawHomeScreen() {
             state.iconBounds.push({ x, y, size: iconSize, type: iconType });
         }
     }
+
+    ctx.restore(); // remove clipping
+    ctx.drawImage(state.phoneBezelImage, 0, 0);
 }
 
 export function drawAppScreen(appName) {
-    if (!state.originalImageWithBlackScreen || !state.originalImageWithBlackScreen.complete) return;
+    if (!state.phoneBezelImage || !state.phoneBezelImage.complete) return;
     if (state.timeInterval) {
         clearInterval(state.timeInterval);
         state.timeInterval = null;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(state.originalImageWithBlackScreen, 0, 0);
+    
+    setupScreenClip();
+    
+    // Draw black background before app content
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     const bounds = state.screenBounds;
 
     const appFunctionName = `draw${appName.charAt(0).toUpperCase() + appName.slice(1)}App`;
@@ -351,6 +423,9 @@ export function drawAppScreen(appName) {
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.strokeRect(homeButtonX, homeButtonY, homeButtonSize, homeButtonSize);
+
+    ctx.restore(); // remove clipping
+    ctx.drawImage(state.phoneBezelImage, 0, 0);
 }
 
 export function clearCanvas() {
