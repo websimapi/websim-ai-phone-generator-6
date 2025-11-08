@@ -130,18 +130,21 @@ p {
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background-color: rgba(0,0,0,0.6);
+    background-color: rgba(0,0,0,0.7);
     color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.9rem;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 500;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.3s ease-in-out;
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    pointer-events: none;
 }
 
-#phone-canvas:hover + #reset-text,
-#reset-text:hover {
+#result-container:hover #reset-text {
     opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(-10px);
 }
 

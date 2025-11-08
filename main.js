@@ -6,7 +6,7 @@ import { processImage } from './js/imageProcessor.js';
 import { startClock, drawHomeScreen, drawAppScreen } from './js/renderer.js';
 
 function handleCanvasClick(e) {
-    if (!state.screenBounds) return;
+    if (!state.phoneBodyOverlay) return; // Only return if no phone has been generated at all
 
     const rect = getCanvas().getBoundingClientRect();
     const scaleX = getCanvas().width / rect.width;
@@ -14,8 +14,9 @@ function handleCanvasClick(e) {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
-    // Ignore clicks outside the screen bounds
-    if (x < state.screenBounds.minX || x > state.screenBounds.maxX || y < state.screenBounds.minY || y > state.screenBounds.maxY) {
+    // Clicks outside the interactive screen area should do nothing.
+    // If screenBounds is null (no screen found), this will always be true.
+    if (!state.screenBounds || x < state.screenBounds.minX || x > state.screenBounds.maxX || y < state.screenBounds.minY || y > state.screenBounds.maxY) {
         return;
     }
 
