@@ -2,19 +2,6 @@ import { state } from './state.js';
 import * as apps from './apps.js';
 import { canvas, ctx } from './canvas.js';
 
-function applyScreenClip() {
-    ctx.save();
-    ctx.beginPath();
-    // Use the screen background image (which is a black shape of the screen on a transparent background)
-    // to create a clipping path.
-    // The "source-in" operation means we'll only draw where the new shape (the screen background)
-    // and the existing content are both non-transparent. Since the canvas is clear, this effectively
-    // sets the screen shape as the clipping region.
-    ctx.globalCompositeOperation = 'source-in';
-    ctx.drawImage(state.screenBackground, 0, 0);
-    ctx.globalCompositeOperation = 'source-over'; // Reset for normal drawing
-}
-
 export function startClock() {
     if (state.timeInterval) {
         clearInterval(state.timeInterval);
@@ -39,8 +26,6 @@ export function startClock() {
         const fontSize = Math.max(12, Math.floor(screenWidth / 8));
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.fillText(timeString, centerX, centerY);
-
-        applyScreenClip();
 
         // Draw phone body on top
         ctx.drawImage(state.phoneBodyOverlay, 0, 0);
@@ -197,9 +182,6 @@ export function drawHomeScreen() {
             state.iconBounds.push({ x, y, size: iconSize, type: iconType });
         }
     }
-    
-    applyScreenClip();
-
     // Draw phone body on top of icons
     ctx.drawImage(state.phoneBodyOverlay, 0, 0);
 }
@@ -232,8 +214,6 @@ export function drawAppScreen(appName) {
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.strokeRect(homeButtonX, homeButtonY, homeButtonSize, homeButtonSize);
-
-    applyScreenClip();
 
     // Draw phone body on top of app content
     ctx.drawImage(state.phoneBodyOverlay, 0, 0);
