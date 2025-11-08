@@ -1,6 +1,8 @@
 export async function generatePhoneImage(userPrompt) {
-    // A specific, vibrant pink is used to make detection easier and more reliable.
-    const fullPrompt = `A front-facing close-up of ${userPrompt}, smartphone, with a solid magenta (#FF00FF) screen, on a transparent background, studio lighting, photorealistic.`;
+    // Detailed technical specification for consistent front-facing phone generation
+    const technicalSpec = `Professional product photography of a smartphone device. CRITICAL REQUIREMENTS: Perfect front-facing view at 0° angle, completely flat to camera with no perspective distortion or rotation. Device must be vertically oriented in portrait mode. Screen must be filled with solid magenta color (#FF00FF, RGB 255,0,255) with no gradients or variations. Transparent background (alpha channel). Studio lighting with soft shadows. Photorealistic rendering with accurate materials and textures. Sharp focus across entire device. No hands, no props, no environment - only the isolated phone.`;
+    
+    const fullPrompt = `${technicalSpec} DEVICE DESCRIPTION: ${userPrompt}. ${technicalSpec}`;
 
     try {
         const result = await websim.imageGen({
@@ -12,6 +14,6 @@ export async function generatePhoneImage(userPrompt) {
     } catch (error) {
         console.error('Error generating image:', error);
         alert('Failed to generate image. Please try again.');
-        throw error; // Re-throw to be caught by the caller
+        throw error;
     }
 }
