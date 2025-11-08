@@ -172,7 +172,6 @@ export function processImage(imageUrl, onProcessed) {
         }
 
         // Convert ImageData to Image objects for efficient drawing
-        const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvas.width;
         tempCanvas.height = canvas.height;
         const tempCtx = tempCanvas.getContext('2d');
