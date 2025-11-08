@@ -75,8 +75,10 @@ export function processImage(imageUrl, onProcessed) {
         const centerIndex = (centerY * canvas.width + centerX) * 4;
         const targetColor = { r: scaledData[centerIndex], g: scaledData[centerIndex + 1], b: scaledData[centerIndex + 2] };
 
-        const pinkThreshold = 50; // Adjust as needed
-        const isPink = targetColor.r > 200 && targetColor.g < 100 && targetColor.b > 200;
+        const pinkThreshold = 80; // More lenient threshold. Was 50.
+        const magenta = { r: 255, g: 0, b: 255 };
+        // Check distance from pure magenta to see if we should start flood fill
+        const isPink = colorDistance(targetColor, magenta) < pinkThreshold;
 
         let foundScreen = false;
         let localScreenBounds = null;
