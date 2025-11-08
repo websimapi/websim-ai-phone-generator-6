@@ -69,60 +69,62 @@ export function processImage(imageUrl, onProcessed) {
         const scaledImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const scaledData = scaledImageData.data;
 
-        // Find largest white rectangle (the screen)
-        const whiteThreshold = 240;
-        let largestRect = { x: 0, y: 0, width: 0, height: 0, area: 0 };
-        for (let y = 0; y < canvas.height; y++) {
-            for (let x = 0; x < canvas.width; x++) {
-                const i = (y * canvas.width + x) * 4;
-                if (scaledData[i] > whiteThreshold && scaledData[i+1] > whiteThreshold && scaledData[i+2] > whiteThreshold) {
-                    let w = 1;
-                    while (x + w < canvas.width) {
-                        const nextI = (y * canvas.width + x + w) * 4;
-                        if (scaledData[nextI] > whiteThreshold && scaledData[nextI+1] > whiteThreshold && scaledData[nextI+2] > whiteThreshold) {
-                            w++;
-                        } else {
-                            break;
-                        }
-                    }
+        // Screen detection using center pixel and flood fill
+        const centerX = Math.floor(canvas.width / 2);
+        const centerY = Math.floor(canvas.height / 2);
+        const centerIndex = (centerY * canvas.width + centerX) * 4;
+        const targetColor = { r: scaledData[centerIndex], g: scaledData[centerIndex + 1], b: scaledData[centerIndex + 2] };
 
-                    for (let h = 1; y + h < canvas.height; h++) {
-                        let isRowWhite = true;
-                        for (let k = 0; k < w; k++) {
-                           const checkI = ((y + h) * canvas.width + x + k) * 4;
-                           if (!(scaledData[checkI] > whiteThreshold && scaledData[checkI+1] > whiteThreshold && scaledData[checkI+2] > whiteThreshold)) {
-                               isRowWhite = false;
-                               break;
-                           }
-                        }
-                        if (!isRowWhite) break;
+        const pinkThreshold = 50; // Adjust as needed
+        const isPink = targetColor.r > 200 && targetColor.g < 100 && targetColor.b > 200;
 
-                        const area = w * (h + 1);
-                        if (area > largestRect.area) {
-                            largestRect = { x, y, width: w, height: h + 1, area };
+        let foundScreen = false;
+        let localScreenBounds = null;
+
+        if (isPink) {
+            const screenMask = new Uint8Array(canvas.width * canvas.height);
+            const q = [[centerX, centerY]];
+            screenMask[centerY * canvas.width + centerX] = 1;
+            
+            let head = 0;
+            localScreenBounds = { minX: centerX, minY: centerY, maxX: centerX, maxY: centerY };
+
+            while(head < q.length) {
+                const [x, y] = q[head++];
+
+                localScreenBounds.minX = Math.min(localScreenBounds.minX, x);
+                localScreenBounds.minY = Math.min(localScreenBounds.minY, y);
+                localScreenBounds.maxX = Math.max(localScreenBounds.maxX, x);
+                localScreenBounds.maxY = Math.max(localScreenBounds.maxY, y);
+
+                const neighbors = [[x, y - 1], [x, y + 1], [x - 1, y], [x + 1, y]];
+                for (const [nx, ny] of neighbors) {
+                    if (nx >= 0 && nx < canvas.width && ny >= 0 && ny < canvas.height) {
+                        const nIndex = ny * canvas.width + nx;
+                        if (screenMask[nIndex] === 0) {
+                            const nIndex4 = nIndex * 4;
+                            const neighborColor = { r: scaledData[nIndex4], g: scaledData[nIndex4 + 1], b: scaledData[nIndex4 + 2] };
+                            if (colorDistance(targetColor, neighborColor) < pinkThreshold) {
+                                screenMask[nIndex] = 1;
+                                q.push([nx, ny]);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        let foundScreen = largestRect.area > (canvas.width * canvas.height * 0.1); // Screen must be at least 10% of image area
-        let localScreenBounds = null;
-
-        if (foundScreen) {
-             localScreenBounds = {
-                minX: largestRect.x,
-                minY: largestRect.y,
-                maxX: largestRect.x + largestRect.width,
-                maxY: largestRect.y + largestRect.height
-            };
-            // Turn screen black
-            ctx.fillStyle = 'black';
-            ctx.fillRect(localScreenBounds.minX, localScreenBounds.minY, localScreenBounds.maxX - localScreenBounds.minX, localScreenBounds.maxY - localScreenBounds.minY);
+            const screenArea = (localScreenBounds.maxX - localScreenBounds.minX) * (localScreenBounds.maxY - localScreenBounds.minY);
+            if (screenArea > canvas.width * canvas.height * 0.1) {
+                foundScreen = true;
+                ctx.fillStyle = 'black';
+                ctx.fillRect(localScreenBounds.minX, localScreenBounds.minY, localScreenBounds.maxX - localScreenBounds.minX, localScreenBounds.maxY - localScreenBounds.minY);
+            } else {
+                 console.log("Detected pink area is too small to be a screen.");
+            }
         } else {
-            console.log("No significant white screen area found.");
+            console.log("Center pixel is not pink. Could not detect screen.");
         }
-
+    
         state.originalImageWithBlackScreen = new Image();
         state.originalImageWithBlackScreen.src = canvas.toDataURL();
         state.originalImageWithBlackScreen.onload = () => {
