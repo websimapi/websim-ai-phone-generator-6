@@ -1,20 +1,22 @@
 import { state, resetState } from './js/state.js';
 import * as ui from './js/ui.js';
 import { generatePhoneImage } from './js/api.js';
-import * as canvas from './js/canvas.js';
+import { getCanvas, clearCanvas } from './js/canvas.js';
+import { processImage } from './js/imageProcessor.js';
+import { startClock, drawHomeScreen, drawAppScreen } from './js/renderer.js';
 
 function handleCanvasClick(e) {
     if (!state.screenBounds) return;
 
-    const rect = canvas.getCanvas().getBoundingClientRect();
-    const scaleX = canvas.getCanvas().width / rect.width;
-    const scaleY = canvas.getCanvas().height / rect.height;
+    const rect = getCanvas().getBoundingClientRect();
+    const scaleX = getCanvas().width / rect.width;
+    const scaleY = getCanvas().height / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
     if (state.phoneState === 'locked') {
         state.phoneState = 'unlocked';
-        canvas.drawHomeScreen();
+        drawHomeScreen();
     } else if (state.phoneState === 'unlocked') {
         const clickedIcon = state.iconBounds.find(icon =>
             x >= icon.x && x <= icon.x + icon.size &&
@@ -23,7 +25,7 @@ function handleCanvasClick(e) {
         if (clickedIcon) {
             state.phoneState = 'in-app';
             state.currentApp = clickedIcon.type;
-            canvas.drawAppScreen(state.currentApp);
+            drawAppScreen(state.currentApp);
         }
     } else if (state.phoneState === 'in-app') {
         const screenWidth = state.screenBounds.maxX - state.screenBounds.minX;
@@ -34,7 +36,7 @@ function handleCanvasClick(e) {
         if (x >= homeButtonX && x <= homeButtonX + homeButtonSize && y >= homeButtonY && y <= homeButtonY + homeButtonSize) {
             state.phoneState = 'unlocked';
             state.currentApp = null;
-            canvas.drawHomeScreen();
+            drawHomeScreen();
         }
     }
 }
@@ -50,11 +52,11 @@ async function generatePhone() {
     resetState();
     ui.showControls(false);
     ui.setLoading(true);
-    canvas.clearCanvas();
+    clearCanvas();
 
     try {
         const imageUrl = await generatePhoneImage(userPrompt);
-        canvas.processImage(imageUrl, (foundScreen, error) => {
+        processImage(imageUrl, (foundScreen, error) => {
             ui.setLoading(false);
             if(error) {
                  ui.showControls(true);
@@ -62,7 +64,7 @@ async function generatePhone() {
             }
             if (foundScreen) {
                 state.phoneState = 'locked';
-                canvas.startClock();
+                startClock();
             } else {
                 state.phoneState = 'no-screen'; // Keep the static image, don't revert to initial.
             }
@@ -79,14 +81,13 @@ function resetApp() {
         resetState();
         ui.showControls(true);
         ui.showResetText(false);
-        canvas.clearCanvas();
+        clearCanvas();
     }
 }
 
 function main() {
     ui.initUI(generatePhone, resetApp);
-    canvas.getCanvas().addEventListener('click', handleCanvasClick);
+    getCanvas().addEventListener('click', handleCanvasClick);
 }
 
 main();
-
