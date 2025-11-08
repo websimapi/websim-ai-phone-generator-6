@@ -74,7 +74,7 @@ async function generatePhone() {
             } else {
                 state.phoneState = 'no-screen'; // Keep the static image, don't revert to initial.
             }
-            ui.showResetText(true);
+            ui.showResetButton(true);
         });
     } catch (error) {
         ui.setLoading(false);
@@ -86,7 +86,7 @@ function resetApp() {
     if (state.phoneBodyOverlay) {
         resetState();
         ui.showControls(true);
-        ui.showResetText(false);
+        ui.showResetButton(false);
         clearCanvas();
     }
 }

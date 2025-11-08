@@ -2,7 +2,7 @@ const controls = document.querySelector('.controls');
 const promptInput = document.getElementById('prompt-input');
 const generateBtn = document.getElementById('generate-btn');
 const loader = document.getElementById('loader');
-const resetText = document.getElementById('reset-text');
+const resetBtn = document.getElementById('reset-btn');
 
 export function initUI(generateCallback, resetCallback) {
     generateBtn.addEventListener('click', generateCallback);
@@ -11,7 +11,7 @@ export function initUI(generateCallback, resetCallback) {
             generateCallback();
         }
     });
-    resetText.addEventListener('click', resetCallback);
+    resetBtn.addEventListener('click', resetCallback);
 }
 
 export function setLoading(isLoading) {
@@ -32,11 +32,11 @@ export function showControls(show) {
     }
 }
 
-export function showResetText(show) {
+export function showResetButton(show) {
     if (show) {
-        resetText.classList.remove('hidden');
+        resetBtn.classList.remove('hidden');
     } else {
-        resetText.classList.add('hidden');
+        resetBtn.classList.add('hidden');
     }
 }
 

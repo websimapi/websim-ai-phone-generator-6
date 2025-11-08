@@ -149,3 +149,30 @@ p {
     transform: translateY(-2px);
 }
 
+#reset-btn {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: rgba(0,0,0,0.5);
+    border: none;
+    padding: 10px;
+    margin: 0;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    z-index: 9999;
+    line-height: 0; /* To remove extra space around the img */
+}
+
+#reset-btn.hidden {
+    display: none;
+}
+
+#reset-btn:hover {
+    background-color: rgba(0,0,0,0.8);
+}
+
+#reset-btn img {
+    width: 24px;
+    height: 24px;
+}
+
