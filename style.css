@@ -120,48 +120,6 @@ p {
     cursor: pointer;
 }
 
-#reset-container {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: rgba(0,0,0,0.6);
-    color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-#result-container:hover #reset-container {
-    opacity: 1;
-}
-
-#pin-feedback {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    font-size: 1.5rem;
-    font-weight: bold;
-    padding: 10px 20px;
-    border-radius: 10px;
-    text-align: center;
-    z-index: 20;
-}
-
-#pin-feedback.success {
-    background-color: rgba(40, 167, 69, 0.8);
-}
-
-#pin-feedback.error {
-    background-color: rgba(220, 53, 69, 0.8);
-}
-
-
 #reset-text {
     position: absolute;
     bottom: 20px;

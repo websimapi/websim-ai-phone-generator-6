@@ -6,18 +6,10 @@ const generateBtn = document.getElementById('generate-btn');
 const loader = document.getElementById('loader');
 const canvas = document.getElementById('phone-canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
-const resetContainer = document.getElementById('reset-container');
-const pinFeedback = document.getElementById('pin-feedback');
+const resetText = document.getElementById('reset-text');
 
 let timeInterval = null;
-let originalImageWithBlackScreen = null;
-let phoneState = 'locked'; // 'locked', 'unlocking', 'unlocked'
-let screenBounds = null;
-const pinDots = [];
-let currentPinPath = [];
-let isDrawingPin = false;
-const correctPin = [4, 7, 8, 9, 6];
-
+let originalImageWithBlackScreen = null; // To store the phone image with the black screen
 
 generateBtn.addEventListener('click', generatePhone);
 promptInput.addEventListener('keyup', (e) => {
@@ -26,79 +18,27 @@ promptInput.addEventListener('keyup', (e) => {
     }
 });
 
-function resetApp() {
-    controls.classList.remove('hidden');
-    resetContainer.classList.add('hidden');
-    pinFeedback.classList.add('hidden');
-    if (timeInterval) {
-        clearInterval(timeInterval);
-        timeInterval = null;
-    }
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    originalImageWithBlackScreen = null;
-    screenBounds = null;
-    phoneState = 'locked';
-    currentPinPath = [];
-    pinDots.length = 0;
-    canvas.width = 1;
-    canvas.height = 1;
-}
-
-resetContainer.addEventListener('click', resetApp);
-
-canvas.addEventListener('pointerdown', handlePointerDown);
-canvas.addEventListener('pointermove', handlePointerMove);
-canvas.addEventListener('pointerup', handlePointerUp);
-canvas.addEventListener('pointerleave', handlePointerUp);
-
-
-function handlePointerDown(e) {
-    if (phoneState === 'locked' && originalImageWithBlackScreen) {
-        phoneState = 'unlocking';
+canvas.addEventListener('click', () => {
+    if (originalImageWithBlackScreen) { // only if an image is present
+        controls.classList.remove('hidden');
+        resetText.classList.add('hidden');
         if (timeInterval) {
             clearInterval(timeInterval);
             timeInterval = null;
         }
-        preparePinPad();
-        drawPinPadUI();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        originalImageWithBlackScreen = null;
+        // make canvas small to hide it until next generation
+        canvas.width = 1;
+        canvas.height = 1;
     }
-
-    if (phoneState !== 'unlocking') return;
-    isDrawingPin = true;
-    currentPinPath = [];
-    checkPinDotHit(e);
-}
-
-function handlePointerMove(e) {
-    if (phoneState !== 'unlocking' || !isDrawingPin) return;
-    drawPinPadUI(); // Redraw base
-    drawCurrentPinPath(e.offsetX, e.offsetY); // Draw lines
-    checkPinDotHit(e); // Check for new dots
-}
-
-function handlePointerUp() {
-    if (phoneState !== 'unlocking' || !isDrawingPin) return;
-    isDrawingPin = false;
-    checkPin();
-}
-
-function checkPinDotHit(e) {
-    const { offsetX: x, offsetY: y } = e;
-    pinDots.forEach(dot => {
-        const dist = Math.sqrt((x - dot.x) ** 2 + (y - dot.y) ** 2);
-        if (dist < dot.radius * 2 && !currentPinPath.includes(dot.id)) {
-            currentPinPath.push(dot.id);
-        }
-    });
-}
-
+});
 
 function setLoading(isLoading) {
     generateBtn.disabled = isLoading;
     promptInput.disabled = isLoading;
     if (isLoading) {
         loader.classList.remove('hidden');
-        resetContainer.classList.add('hidden');
     } else {
         loader.classList.add('hidden');
     }
@@ -111,7 +51,10 @@ async function generatePhone() {
         return;
     }
 
-    resetApp(); // Reset state before generating a new one
+    if (timeInterval) {
+        clearInterval(timeInterval);
+        timeInterval = null;
+    }
 
     controls.classList.add('hidden');
     setLoading(true);
@@ -177,10 +120,10 @@ function processImage(imageUrl) {
                 // Update screen bounding box
                 const x = (i / 4) % canvas.width;
                 const y = Math.floor((i / 4) / canvas.width);
-                if (x < screenBounds.minX) screenBounds.minX = x;
-                if (y < screenBounds.minY) screenBounds.minY = y;
-                if (x > screenBounds.maxX) screenBounds.maxX = x;
-                if (y > screenBounds.maxY) screenBounds.maxY = y;
+                screenBounds.minX = Math.min(screenBounds.minX, x);
+                screenBounds.minY = Math.min(screenBounds.minY, y);
+                screenBounds.maxX = Math.max(screenBounds.maxX, x);
+                screenBounds.maxY = Math.max(screenBounds.maxY, y);
                 foundScreen = true;
             }
         }
@@ -191,13 +134,10 @@ function processImage(imageUrl) {
         originalImageWithBlackScreen = new Image();
         originalImageWithBlackScreen.src = canvas.toDataURL();
         originalImageWithBlackScreen.onload = () => {
-             if (foundScreen) {
-                // Store screen bounds globally
-                this.screenBounds = screenBounds;
-                phoneState = 'locked';
-                startClock();
+            if (foundScreen) {
+                startClock(screenBounds);
             }
-            resetContainer.classList.remove('hidden');
+            resetText.classList.remove('hidden');
         };
 
         setLoading(false);
@@ -218,13 +158,13 @@ function colorDistance(c1, c2) {
     return Math.sqrt((((512 + rmean) * r * r) >> 8) + 4 * g * g + (((767 - rmean) * b * b) >> 8));
 }
 
-function startClock() {
+function startClock(bounds) {
     if (timeInterval) {
         clearInterval(timeInterval);
     }
-    const bounds = this.screenBounds;
+
     const drawTime = () => {
-        if (!originalImageWithBlackScreen || !originalImageWithBlackScreen.complete || phoneState !== 'locked') return;
+        if (!originalImageWithBlackScreen || !originalImageWithBlackScreen.complete) return;
 
         // Redraw the base image to clear old time
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -250,97 +190,4 @@ function startClock() {
 
     drawTime(); // Initial draw
     timeInterval = setInterval(drawTime, 1000);
-}
-
-function preparePinPad() {
-    if (!screenBounds) return;
-    pinDots.length = 0;
-    const screenWidth = screenBounds.maxX - screenBounds.minX;
-    const screenHeight = screenBounds.maxY - screenBounds.minY;
-    const dotRadius = Math.min(screenWidth, screenHeight) / 20;
-
-    for (let row = 0; row < 3; row++) {
-        for (let col = 0; col < 3; col++) {
-            const x = screenBounds.minX + screenWidth * (0.25 + col * 0.25);
-            const y = screenBounds.minY + screenHeight * (0.25 + row * 0.25);
-            const id = row * 3 + col + 1;
-            pinDots.push({ id, x, y, radius: dotRadius });
-        }
-    }
-}
-
-function drawPinPadUI() {
-    if (!originalImageWithBlackScreen || !originalImageWithBlackScreen.complete) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(originalImageWithBlackScreen, 0, 0);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    pinDots.forEach(dot => {
-        ctx.beginPath();
-        ctx.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
-        ctx.fill();
-    });
-}
-
-function drawCurrentPinPath(endX, endY) {
-    if (currentPinPath.length === 0) return;
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = pinDots[0] ? pinDots[0].radius / 2 : 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.beginPath();
-    const startDot = pinDots.find(d => d.id === currentPinPath[0]);
-    ctx.moveTo(startDot.x, startDot.y);
-
-    for (let i = 1; i < currentPinPath.length; i++) {
-        const dot = pinDots.find(d => d.id === currentPinPath[i]);
-        ctx.lineTo(dot.x, dot.y);
-    }
-
-    if (isDrawingPin && endX !== undefined && endY !== undefined) {
-        ctx.lineTo(endX, endY);
-    }
-
-    ctx.stroke();
-
-    // Highlight active dots
-    ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-    currentPinPath.forEach(dotId => {
-        const dot = pinDots.find(d => d.id === dotId);
-        if (dot) {
-            ctx.beginPath();
-            ctx.arc(dot.x, dot.y, dot.radius * 1.2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    });
-}
-
-function checkPin() {
-    const isCorrect = currentPinPath.length === correctPin.length && currentPinPath.every((val, index) => val === correctPin[index]);
-    
-    showFeedback(isCorrect);
-
-    setTimeout(() => {
-        pinFeedback.classList.add('hidden');
-        currentPinPath = [];
-        if (isCorrect) {
-            phoneState = 'unlocked';
-            setTimeout(resetApp, 500); // Reset after a short delay
-        } else {
-            drawPinPadUI(); // Reset to initial pin pad view
-        }
-    }, 1000);
-}
-
-function showFeedback(isCorrect) {
-    pinFeedback.classList.remove('hidden', 'success', 'error');
-    if (isCorrect) {
-        pinFeedback.textContent = 'Unlocked!';
-        pinFeedback.classList.add('success');
-    } else {
-        pinFeedback.textContent = 'Try Again';
-        pinFeedback.classList.add('error');
-    }
 }
