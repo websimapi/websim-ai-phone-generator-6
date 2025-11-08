@@ -20,12 +20,20 @@ export function startClock() {
         const centerX = state.screenBounds.minX + screenWidth / 2;
         const centerY = state.screenBounds.minY + (state.screenBounds.maxY - state.screenBounds.minY) / 2;
 
+        // Clip to screen region
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(state.screenBounds.minX, state.screenBounds.minY, screenWidth, state.screenBounds.maxY - state.screenBounds.minY);
+        ctx.clip();
+
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const fontSize = Math.max(12, Math.floor(screenWidth / 8));
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.fillText(timeString, centerX, centerY);
+
+        ctx.restore();
 
         // Draw phone body on top
         ctx.drawImage(state.phoneBodyOverlay, 0, 0);
@@ -156,6 +164,12 @@ export function drawHomeScreen() {
 
     if (screenWidth < 50 || screenHeight < 50) return;
 
+    // Clip to screen region
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(state.screenBounds.minX, state.screenBounds.minY, screenWidth, screenHeight);
+    ctx.clip();
+
     const numCols = 4;
     const numRows = 5;
     const iconGridWidth = screenWidth * 0.9;
@@ -182,6 +196,9 @@ export function drawHomeScreen() {
             state.iconBounds.push({ x, y, size: iconSize, type: iconType });
         }
     }
+
+    ctx.restore();
+
     // Draw phone body on top of icons
     ctx.drawImage(state.phoneBodyOverlay, 0, 0);
 }
@@ -196,6 +213,12 @@ export function drawAppScreen(appName) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(state.screenBackground, 0, 0);
     const bounds = state.screenBounds;
+
+    // Clip to screen region
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+    ctx.clip();
 
     const appFunctionName = `draw${appName.charAt(0).toUpperCase() + appName.slice(1)}App`;
     if (apps[appFunctionName]) {
@@ -214,6 +237,8 @@ export function drawAppScreen(appName) {
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.strokeRect(homeButtonX, homeButtonY, homeButtonSize, homeButtonSize);
+
+    ctx.restore();
 
     // Draw phone body on top of app content
     ctx.drawImage(state.phoneBodyOverlay, 0, 0);

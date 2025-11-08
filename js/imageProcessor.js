@@ -177,18 +177,22 @@ export function processImage(imageUrl, onProcessed) {
         }
 
         // Convert ImageData to Image objects for efficient drawing
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
-        // tempCtx is already declared. Resizing the canvas resets its state.
+        const overlayCanvas = document.createElement('canvas');
+        const overlayCtx = overlayCanvas.getContext('2d');
+        overlayCanvas.width = canvas.width;
+        overlayCanvas.height = canvas.height;
 
-        tempCtx.putImageData(new ImageData(phoneBodyOverlayData, canvas.width, canvas.height), 0, 0);
+        overlayCtx.putImageData(new ImageData(phoneBodyOverlayData, canvas.width, canvas.height), 0, 0);
         state.phoneBodyOverlay = new Image();
-        state.phoneBodyOverlay.src = tempCanvas.toDataURL();
+        state.phoneBodyOverlay.src = overlayCanvas.toDataURL();
 
-        tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
-        tempCtx.putImageData(new ImageData(screenBackgroundData.data, canvas.width, canvas.height), 0, 0);
+        const bgCanvas = document.createElement('canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        bgCanvas.width = canvas.width;
+        bgCanvas.height = canvas.height;
+        bgCtx.putImageData(new ImageData(screenBackgroundData.data, canvas.width, canvas.height), 0, 0);
         state.screenBackground = new Image();
-        state.screenBackground.src = tempCanvas.toDataURL();
+        state.screenBackground.src = bgCanvas.toDataURL();
 
         let loadedCount = 0;
         const onAllLoaded = () => {
