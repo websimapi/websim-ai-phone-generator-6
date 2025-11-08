@@ -18,48 +18,110 @@ function colorDistance(c1, c2) {
 
 export function processImage(imageUrl, onProcessed) {
     const img = new Image();
-    img.crossOrigin = "Anonymous"; // Required for loading images from other domains into canvas
+    img.crossOrigin = "Anonymous";
     img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // Find phone body bounds (non-transparent pixels)
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        tempCtx.drawImage(img, 0, 0);
+        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
         const data = imageData.data;
-
-        const centerX = Math.floor(canvas.width / 2);
-        const centerY = Math.floor(canvas.height / 2);
-        const centerIndex = (centerY * canvas.width + centerX) * 4;
-        const targetColor = {
-            r: data[centerIndex],
-            g: data[centerIndex + 1],
-            b: data[centerIndex + 2]
-        };
-
-        const colorThreshold = 80;
-        let foundScreen = false;
-        let localScreenBounds = { minX: canvas.width, minY: canvas.height, maxX: 0, maxY: 0 };
-
+        
+        let phoneBounds = { minX: tempCanvas.width, minY: tempCanvas.height, maxX: 0, maxY: 0 };
         for (let i = 0; i < data.length; i += 4) {
-            const currentColor = { r: data[i], g: data[i + 1], b: data[i + 2] };
-            const distance = colorDistance(currentColor, targetColor);
-
-            if (distance < colorThreshold) {
-                data[i] = 0;
-                data[i + 1] = 0;
-                data[i + 2] = 0;
-
-                const x = (i / 4) % canvas.width;
-                const y = Math.floor((i / 4) / canvas.width);
-                localScreenBounds.minX = Math.min(localScreenBounds.minX, x);
-                localScreenBounds.minY = Math.min(localScreenBounds.minY, y);
-                localScreenBounds.maxX = Math.max(localScreenBounds.maxX, x);
-                localScreenBounds.maxY = Math.max(localScreenBounds.maxY, y);
-                foundScreen = true;
+            if (data[i + 3] > 0) { // Check alpha channel
+                const x = (i / 4) % tempCanvas.width;
+                const y = Math.floor((i / 4) / tempCanvas.width);
+                phoneBounds.minX = Math.min(phoneBounds.minX, x);
+                phoneBounds.minY = Math.min(phoneBounds.minY, y);
+                phoneBounds.maxX = Math.max(phoneBounds.maxX, x);
+                phoneBounds.maxY = Math.max(phoneBounds.maxY, y);
             }
         }
 
-        ctx.putImageData(imageData, 0, 0);
+        const phoneWidth = phoneBounds.maxX - phoneBounds.minX;
+        const phoneHeight = phoneBounds.maxY - phoneBounds.minY;
+        
+        if (phoneWidth <=0 || phoneHeight <= 0) {
+            alert("Could not detect a phone in the generated image.");
+            onProcessed(false, true);
+            return;
+        }
+
+        // Scale phone to fit container height
+        const containerHeight = document.getElementById('result-container').clientHeight;
+        const scale = containerHeight / phoneHeight;
+        const newWidth = phoneWidth * scale;
+        const newHeight = phoneHeight * scale;
+
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+
+        // Draw cropped and scaled phone image
+        ctx.drawImage(
+            img,
+            phoneBounds.minX, phoneBounds.minY, phoneWidth, phoneHeight, // source rect
+            0, 0, newWidth, newHeight // destination rect
+        );
+
+        const scaledImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const scaledData = scaledImageData.data;
+
+        // Find largest white rectangle (the screen)
+        const whiteThreshold = 240;
+        let largestRect = { x: 0, y: 0, width: 0, height: 0, area: 0 };
+        for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+                const i = (y * canvas.width + x) * 4;
+                if (scaledData[i] > whiteThreshold && scaledData[i+1] > whiteThreshold && scaledData[i+2] > whiteThreshold) {
+                    let w = 1;
+                    while (x + w < canvas.width) {
+                        const nextI = (y * canvas.width + x + w) * 4;
+                        if (scaledData[nextI] > whiteThreshold && scaledData[nextI+1] > whiteThreshold && scaledData[nextI+2] > whiteThreshold) {
+                            w++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    for (let h = 1; y + h < canvas.height; h++) {
+                        let isRowWhite = true;
+                        for (let k = 0; k < w; k++) {
+                           const checkI = ((y + h) * canvas.width + x + k) * 4;
+                           if (!(scaledData[checkI] > whiteThreshold && scaledData[checkI+1] > whiteThreshold && scaledData[checkI+2] > whiteThreshold)) {
+                               isRowWhite = false;
+                               break;
+                           }
+                        }
+                        if (!isRowWhite) break;
+
+                        const area = w * (h + 1);
+                        if (area > largestRect.area) {
+                            largestRect = { x, y, width: w, height: h + 1, area };
+                        }
+                    }
+                }
+            }
+        }
+
+        let foundScreen = largestRect.area > (canvas.width * canvas.height * 0.1); // Screen must be at least 10% of image area
+        let localScreenBounds = null;
+
+        if (foundScreen) {
+             localScreenBounds = {
+                minX: largestRect.x,
+                minY: largestRect.y,
+                maxX: largestRect.x + largestRect.width,
+                maxY: largestRect.y + largestRect.height
+            };
+            // Turn screen black
+            ctx.fillStyle = 'black';
+            ctx.fillRect(localScreenBounds.minX, localScreenBounds.minY, localScreenBounds.maxX - localScreenBounds.minX, localScreenBounds.maxY - localScreenBounds.minY);
+        } else {
+            console.log("No significant white screen area found.");
+        }
 
         state.originalImageWithBlackScreen = new Image();
         state.originalImageWithBlackScreen.src = canvas.toDataURL();
