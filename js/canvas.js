@@ -74,27 +74,40 @@ export function processImage(imageUrl, onProcessed) {
         const phoneBodyOverlayData = new Uint8ClampedArray(scaledData.length);
         const screenBackgroundData = ctx.createImageData(canvas.width, canvas.height);
 
-        // Screen detection using center pixel and flood fill
+        // Screen detection: search for a pink starting pixel in the center of the image.
         const centerX = Math.floor(canvas.width / 2);
         const centerY = Math.floor(canvas.height / 2);
-        const centerIndex = (centerY * canvas.width + centerX) * 4;
-        const targetColor = { r: scaledData[centerIndex], g: scaledData[centerIndex + 1], b: scaledData[centerIndex + 2] };
-
+        const searchRadius = Math.min(canvas.width, canvas.height) * 0.1; // Search 10% of smaller dimension
+        
+        let startPixel = null;
         const pinkThreshold = 80; // More lenient threshold. Was 50.
         const magenta = { r: 255, g: 0, b: 255 };
-        // Check distance from pure magenta to see if we should start flood fill
-        const isPink = colorDistance(targetColor, magenta) < pinkThreshold;
+
+        for (let y = Math.floor(centerY - searchRadius); y < Math.floor(centerY + searchRadius); y++) {
+            for (let x = Math.floor(centerX - searchRadius); x < Math.floor(centerX + searchRadius); x++) {
+                if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+                    const index = (y * canvas.width + x) * 4;
+                    const color = { r: scaledData[index], g: scaledData[index + 1], b: scaledData[index + 2] };
+                    if (colorDistance(color, magenta) < pinkThreshold) {
+                        startPixel = { x, y, color };
+                        break;
+                    }
+                }
+            }
+            if (startPixel) break;
+        }
 
         let foundScreen = false;
         let localScreenBounds = null;
 
-        if (isPink) {
+        if (startPixel) {
+            const targetColor = startPixel.color;
             const screenMask = new Uint8Array(canvas.width * canvas.height);
-            const q = [[centerX, centerY]];
-            screenMask[centerY * canvas.width + centerX] = 1;
+            const q = [[startPixel.x, startPixel.y]];
+            screenMask[startPixel.y * canvas.width + startPixel.x] = 1;
             
             let head = 0;
-            localScreenBounds = { minX: centerX, minY: centerY, maxX: centerX, maxY: centerY };
+            localScreenBounds = { minX: startPixel.x, minY: startPixel.y, maxX: startPixel.x, maxY: startPixel.y };
 
             while(head < q.length) {
                 const [x, y] = q[head++];
@@ -159,7 +172,7 @@ export function processImage(imageUrl, onProcessed) {
                  // fall through to treat as no screen found
             }
         } else {
-            console.log("Center pixel is not pink. Could not detect screen.");
+            console.log("No pink pixels found in center. Could not detect screen.");
         }
         
         if (!foundScreen) {

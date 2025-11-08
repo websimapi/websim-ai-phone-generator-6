@@ -64,7 +64,7 @@ async function generatePhone() {
                 state.phoneState = 'locked';
                 canvas.startClock();
             } else {
-                state.phoneState = 'initial';
+                state.phoneState = 'no-screen'; // Keep the static image, don't revert to initial.
             }
             ui.showResetText(true);
         });
