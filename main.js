@@ -10,6 +10,8 @@ const resetText = document.getElementById('reset-text');
 
 let timeInterval = null;
 let originalImageWithBlackScreen = null; // To store the phone image with the black screen
+let phoneState = 'initial'; // 'initial', 'generating', 'locked', 'unlocked'
+let screenBounds = null;
 
 generateBtn.addEventListener('click', generatePhone);
 promptInput.addEventListener('keyup', (e) => {
@@ -19,7 +21,22 @@ promptInput.addEventListener('keyup', (e) => {
 });
 
 canvas.addEventListener('click', () => {
+    if (phoneState === 'locked') {
+        phoneState = 'unlocked';
+        if (timeInterval) {
+            clearInterval(timeInterval);
+            timeInterval = null;
+        }
+        drawHomeScreen(screenBounds);
+    } else if (phoneState === 'unlocked') {
+        phoneState = 'locked';
+        startClock(screenBounds);
+    }
+});
+
+resetText.addEventListener('click', () => {
     if (originalImageWithBlackScreen) { // only if an image is present
+        phoneState = 'initial';
         controls.classList.remove('hidden');
         resetText.classList.add('hidden');
         if (timeInterval) {
@@ -28,6 +45,7 @@ canvas.addEventListener('click', () => {
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         originalImageWithBlackScreen = null;
+        screenBounds = null;
         // make canvas small to hide it until next generation
         canvas.width = 1;
         canvas.height = 1;
@@ -51,6 +69,8 @@ async function generatePhone() {
         return;
     }
 
+    phoneState = 'generating';
+
     if (timeInterval) {
         clearInterval(timeInterval);
         timeInterval = null;
@@ -60,6 +80,7 @@ async function generatePhone() {
     setLoading(true);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     originalImageWithBlackScreen = null;
+    screenBounds = null;
 
     // A specific, vibrant pink is used to make detection easier and more reliable.
     const fullPrompt = `A front-facing close-up of ${userPrompt}, smartphone, with a solid bright fuchsia pink (#FF00FF) screen, on a transparent background, studio lighting, photorealistic.`;
@@ -103,8 +124,8 @@ function processImage(imageUrl) {
         };
 
         const colorThreshold = 80; // How similar colors can be to be replaced
-        let screenBounds = { minX: canvas.width, minY: canvas.height, maxX: 0, maxY: 0 };
         let foundScreen = false;
+        let localScreenBounds = { minX: canvas.width, minY: canvas.height, maxX: 0, maxY: 0 };
 
         for (let i = 0; i < data.length; i += 4) {
             const currentColor = { r: data[i], g: data[i+1], b: data[i+2] };
@@ -120,10 +141,10 @@ function processImage(imageUrl) {
                 // Update screen bounding box
                 const x = (i / 4) % canvas.width;
                 const y = Math.floor((i / 4) / canvas.width);
-                screenBounds.minX = Math.min(screenBounds.minX, x);
-                screenBounds.minY = Math.min(screenBounds.minY, y);
-                screenBounds.maxX = Math.max(screenBounds.maxX, x);
-                screenBounds.maxY = Math.max(screenBounds.maxY, y);
+                localScreenBounds.minX = Math.min(localScreenBounds.minX, x);
+                localScreenBounds.minY = Math.min(localScreenBounds.minY, y);
+                localScreenBounds.maxX = Math.max(localScreenBounds.maxX, x);
+                localScreenBounds.maxY = Math.max(localScreenBounds.maxY, y);
                 foundScreen = true;
             }
         }
@@ -135,7 +156,11 @@ function processImage(imageUrl) {
         originalImageWithBlackScreen.src = canvas.toDataURL();
         originalImageWithBlackScreen.onload = () => {
             if (foundScreen) {
+                screenBounds = localScreenBounds;
+                phoneState = 'locked';
                 startClock(screenBounds);
+            } else {
+                phoneState = 'initial';
             }
             resetText.classList.remove('hidden');
         };
@@ -190,4 +215,148 @@ function startClock(bounds) {
 
     drawTime(); // Initial draw
     timeInterval = setInterval(drawTime, 1000);
+}
+
+function drawHomeScreen(bounds) {
+    if (!originalImageWithBlackScreen || !originalImageWithBlackScreen.complete) return;
+
+    // Redraw the base image to clear old time
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(originalImageWithBlackScreen, 0, 0);
+
+    const screenWidth = bounds.maxX - bounds.minX;
+    const screenHeight = bounds.maxY - bounds.minY;
+    
+    // Simple fallback if screen is not found or too small
+    if (screenWidth < 50 || screenHeight < 50) return;
+
+    const numCols = 4;
+    const numRows = 5;
+    const iconGridWidth = screenWidth * 0.9;
+    const iconGridHeight = screenHeight * 0.8;
+    const iconSize = Math.min(iconGridWidth / numCols, iconGridHeight / numRows) * 0.75;
+    const colGap = (iconGridWidth - (iconSize * numCols)) / (numCols + 1);
+    const rowGap = (iconGridHeight - (iconSize * numRows)) / (numRows + 1);
+
+    const startX = bounds.minX + (screenWidth - iconGridWidth) / 2;
+    const startY = bounds.minY + (screenHeight - iconGridHeight) / 2;
+
+    const colors = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
+    const icons = ['phone', 'messages', 'music', 'browser', 'camera', 'settings', 'mail', 'clock'];
+
+    for (let row = 0; row < numRows; row++) {
+        for (let col = 0; col < numCols; col++) {
+            const index = row * numCols + col;
+            if (index >= 8) break; // We only have 8 icon types for now
+
+            const x = startX + colGap + (iconSize + colGap) * col;
+            const y = startY + rowGap + (iconSize + rowGap) * row;
+            drawAppIcon(x, y, iconSize, colors[index % colors.length], icons[index % icons.length]);
+        }
+    }
+}
+
+function drawAppIcon(x, y, size, color, type) {
+    const radius = size * 0.2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + size, y, x + size, y + size, radius);
+    ctx.arcTo(x + size, y + size, x, y + size, radius);
+    ctx.arcTo(x, y + size, x, y, radius);
+    ctx.arcTo(x, y, x + size, y, radius);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.lineWidth = Math.max(1, size * 0.08);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const p = size * 0.25;
+    const cX = x + size / 2;
+    const cY = y + size / 2;
+    const iSize = size - p * 2;
+    
+    ctx.save();
+    ctx.translate(cX, cY);
+    
+    // Simplified icons
+    switch(type) {
+        case 'phone':
+            ctx.rotate(Math.PI / 4 * 3);
+            ctx.beginPath();
+            ctx.arc(0, 0, iSize*0.4, Math.PI * 0.2, Math.PI * 1.5);
+            ctx.stroke();
+            break;
+        case 'messages':
+            ctx.beginPath();
+            ctx.rect(-iSize/2, -iSize/2, iSize, iSize*0.8);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(0, iSize*0.4);
+            ctx.lineTo(-iSize*0.1, iSize*0.5);
+            ctx.lineTo(iSize*0.1, iSize*0.4);
+            ctx.fill();
+            break;
+        case 'music':
+            ctx.beginPath();
+            ctx.arc(-iSize * 0.25, iSize*0.1, iSize * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-iSize * 0.05, iSize*0.1);
+            ctx.lineTo(-iSize * 0.05, -iSize*0.4);
+            ctx.lineTo(iSize*0.3, -iSize*0.3);
+            ctx.stroke();
+            break;
+        case 'browser':
+            ctx.beginPath();
+            ctx.arc(0, 0, iSize / 2, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.moveTo(-iSize/2, 0);
+            ctx.lineTo(iSize/2, 0);
+            ctx.stroke();
+            break;
+        case 'camera':
+            ctx.beginPath();
+            ctx.rect(-iSize/2, -iSize/3, iSize, iSize*0.8);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, 0, iSize*0.2, 0, Math.PI*2);
+            ctx.stroke();
+            break;
+        case 'settings':
+             for(let i=0; i<8; i++){
+                ctx.rotate(Math.PI/4);
+                ctx.beginPath();
+                ctx.moveTo(0, iSize*0.2);
+                ctx.lineTo(0, iSize*0.5);
+                ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.arc(0,0,iSize*0.2,0,Math.PI*2);
+            ctx.fill();
+            break;
+        case 'mail':
+            ctx.strokeRect(-iSize/2, -iSize/3, iSize, iSize*0.7);
+            ctx.beginPath();
+            ctx.moveTo(-iSize/2, -iSize/3);
+            ctx.lineTo(0, iSize*0.1);
+            ctx.lineTo(iSize/2, -iSize/3);
+            ctx.stroke();
+            break;
+        case 'clock':
+            ctx.beginPath();
+            ctx.arc(0, 0, iSize/2, 0, Math.PI*2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0,0);
+            ctx.lineTo(0, -iSize*0.3);
+            ctx.moveTo(0,0);
+            ctx.lineTo(iSize*0.2, 0);
+            ctx.stroke();
+            break;
+    }
+    ctx.restore();
 }

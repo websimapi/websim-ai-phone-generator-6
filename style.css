@@ -130,7 +130,7 @@ p {
     padding: 8px 16px;
     border-radius: 20px;
     font-size: 0.9rem;
-    pointer-events: none; /* Let clicks pass through to canvas */
+    cursor: pointer;
     opacity: 0;
     transition: opacity 0.3s ease-in-out;
 }
